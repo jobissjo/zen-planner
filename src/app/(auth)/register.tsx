@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -12,6 +12,17 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Mail, Calendar } from 'lucide-react-native';
+import { FontAwesome } from '@expo/vector-icons';
+let GoogleSignin: any = null;
+let statusCodes: any = {};
+
+try {
+  const GoogleSigninModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = GoogleSigninModule.GoogleSignin;
+  statusCodes = GoogleSigninModule.statusCodes;
+} catch (e) {
+  console.warn('Google Sign-In is not supported in this environment (e.g., Expo Go).');
+}
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -23,13 +34,62 @@ import { Spacing } from '@/constants/theme';
 type Step = 'details' | 'otp';
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const router = useRouter();
   const theme = useTheme();
 
   const [step, setStep] = useState<Step>('details');
   const [busy, setBusy] = useState(false);
+  const [busyGoogle, setBusyGoogle] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (GoogleSignin) {
+      GoogleSignin.configure({
+        // Replace with your OAuth 2.0 Web Client ID from Google Cloud Console
+        webClientId: 'YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com',
+        offlineAccess: true,
+      });
+    }
+  }, []);
+
+  async function handleGoogleLogin() {
+    if (!GoogleSignin) {
+      setErrorMsg('Google Sign-In is not supported in Expo Go. Please use a development build.');
+      return;
+    }
+    setBusyGoogle(true);
+    setErrorMsg('');
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      
+      let idToken: string | null = null;
+      if (response && 'data' in response && response.data) {
+        idToken = response.data.idToken;
+      } else if (response && 'idToken' in response) {
+        idToken = (response as any).idToken;
+      }
+
+      if (!idToken) {
+        throw new Error('Google Sign-In did not return an ID token.');
+      }
+
+      await loginWithGoogle(idToken);
+    } catch (err: any) {
+      if (err.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled the flow, do nothing
+      } else if (err.code === statusCodes.IN_PROGRESS) {
+        setErrorMsg('Sign-in is already in progress');
+      } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setErrorMsg('Google Play Services are not available on this device');
+      } else {
+        setErrorMsg(err.message || 'Google Sign-In failed');
+      }
+    } finally {
+      setBusyGoogle(false);
+    }
+  }
 
   // Fields
   const [firstName, setFirstName] = useState('');
@@ -265,11 +325,40 @@ export default function RegisterScreen() {
                 <TouchableOpacity
                   style={[styles.button, busy && styles.buttonDisabled]}
                   onPress={handleSendOtp}
-                  disabled={busy}>
+                  disabled={busy || busyGoogle}>
                   {busy ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
                     <ThemedText style={styles.buttonText}>Continue</ThemedText>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.dividerContainer}>
+                  <View style={[styles.dividerLine, { backgroundColor: theme.backgroundSelected }]} />
+                  <ThemedText themeColor="textSecondary" style={styles.dividerText}>or</ThemedText>
+                  <View style={[styles.dividerLine, { backgroundColor: theme.backgroundSelected }]} />
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.googleButton,
+                    {
+                      borderColor: theme.backgroundSelected,
+                      backgroundColor: theme.backgroundElement,
+                    },
+                    (busy || busyGoogle) && styles.buttonDisabled,
+                  ]}
+                  onPress={handleGoogleLogin}
+                  disabled={busy || busyGoogle}>
+                  {busyGoogle ? (
+                    <ActivityIndicator color={theme.text} />
+                  ) : (
+                    <View style={styles.googleButtonContent}>
+                      <FontAwesome name="google" size={18} color="#EA4335" style={styles.googleIcon} />
+                      <ThemedText style={[styles.googleButtonText, { color: theme.text }]}>
+                        Continue with Google
+                      </ThemedText>
+                    </View>
                   )}
                 </TouchableOpacity>
               </View>
@@ -434,5 +523,37 @@ const styles = StyleSheet.create({
   footerLink: {
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.two,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: Spacing.two,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  googleButton: {
+    height: 52,
+    borderWidth: 1,
+    borderRadius: Spacing.two,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleIcon: {
+    marginRight: Spacing.two,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
