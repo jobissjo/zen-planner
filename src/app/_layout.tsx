@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import { useEffect } from 'react';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
@@ -10,6 +11,23 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    // Listen for notifications arriving while the app is in the foreground
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received in foreground:', notification);
+    });
+
+    // Listen for when a user interacts with/taps a notification
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('User interacted with notification:', response);
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (loading) return;

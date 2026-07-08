@@ -779,6 +779,44 @@ export const api = {
     }
   },
 
+  async registerPushToken(pushToken: string): Promise<void> {
+    let response;
+    try {
+      response = await client.post("/api/v1/user/push-token", {
+        push_token: pushToken,
+      });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = (error.response?.data as { message?: string } | undefined)?.message;
+        throw new Error(message || error.message);
+      }
+      throw error;
+    }
+    const payload = response.data as ApiResponse<null>;
+    if (payload.status !== "success") {
+      throw new Error(payload.message || "Failed to register push token");
+    }
+  },
+
+  async unregisterPushToken(pushToken: string): Promise<void> {
+    let response;
+    try {
+      response = await client.post("/api/v1/user/push-token/unregister", {
+        push_token: pushToken,
+      });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = (error.response?.data as { message?: string } | undefined)?.message;
+        throw new Error(message || error.message);
+      }
+      throw error;
+    }
+    const payload = response.data as ApiResponse<null>;
+    if (payload.status !== "success") {
+      throw new Error(payload.message || "Failed to unregister push token");
+    }
+  },
+
   computeWeeklyStats(tasks: Task[]): WeeklyStats {
     const total = tasks.length;
     const completed = tasks.filter((t) => t.status === "completed").length;

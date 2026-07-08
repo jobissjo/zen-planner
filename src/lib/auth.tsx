@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { ApiResponse, AuthSession } from "../types";
 import { api, registerAuthFailureListener } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registerForPushNotificationsAsync } from "./notifications";
 
 const SESSION_KEY = "weekly_planner_session_v1";
 
@@ -34,13 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object") {
+              let sessionData: AuthSession;
               if ("status" in parsed && parsed.status === "success" && "data" in parsed) {
-                setSession(parsed.data);
-                api.setAuthToken(parsed.data.access_token);
+                sessionData = parsed.data;
               } else {
-                setSession(parsed);
-                api.setAuthToken(parsed.access_token);
+                sessionData = parsed as AuthSession;
               }
+              setSession(sessionData);
+              api.setAuthToken(sessionData.access_token);
+
+              // Register push token with backend
+              registerForPushNotificationsAsync().then((token) => {
+                if (token) {
+                  api.registerPushToken(token).catch((e) =>
+                    console.warn("Failed to register push token on startup:", e)
+                  );
+                }
+              });
             }
           } catch {}
         }
@@ -67,6 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(s.data);
     api.setAuthToken(s.data.access_token);
+
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) {
+        api.registerPushToken(token).catch((e) =>
+          console.warn("Failed to register push token on login:", e)
+        );
+      }
+    });
+
     return s;
   };
 
@@ -79,6 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(s.data);
     api.setAuthToken(s.data.access_token);
+
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) {
+        api.registerPushToken(token).catch((e) =>
+          console.warn("Failed to register push token on Google login:", e)
+        );
+      }
+    });
+
     return s;
   };
 
@@ -97,15 +126,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(s);
     api.setAuthToken(s.access_token);
+
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) {
+        api.registerPushToken(token).catch((e) =>
+          console.warn("Failed to register push token on registration:", e)
+        );
+      }
+    });
+
     return s;
   };
 
   const logout = () => {
-    AsyncStorage.removeItem(SESSION_KEY).catch((err) => {
-      console.warn("Failed to remove session from AsyncStorage:", err);
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) {
+        api.unregisterPushToken(token)
+          .catch((e) => console.warn("Failed to unregister push token on logout:", e))
+          .finally(() => {
+            AsyncStorage.removeItem(SESSION_KEY).catch((err) => {
+              console.warn("Failed to remove session from AsyncStorage:", err);
+            });
+            setSession(null);
+            api.setAuthToken("");
+          });
+      } else {
+        AsyncStorage.removeItem(SESSION_KEY).catch((err) => {
+          console.warn("Failed to remove session from AsyncStorage:", err);
+        });
+        setSession(null);
+        api.setAuthToken("");
+      }
     });
-    setSession(null);
-    api.setAuthToken("");
   };
 
 
