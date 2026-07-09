@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Bell, Lock, LogOut, BadgeCheck } from 'lucide-react-native';
+import { User, Bell, Lock, LogOut, BadgeCheck, Shield } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -29,6 +29,18 @@ export default function ProfileScreen() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [reminders, setReminders] = useState(true);
 
+  // Auth settings states
+  const [googleId, setGoogleId] = useState<string | null>(null);
+  const [allowPasswordLogin, setAllowPasswordLogin] = useState(true);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+
+  // Set Password Form state for Google users
+  const [showSetPasswordForm, setShowSetPasswordForm] = useState(false);
+  const [setNewPass, setSetNewPass] = useState('');
+  const [setConfirmPass, setSetConfirmPass] = useState('');
+  const [setPassBusy, setSetPassBusy] = useState(false);
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -38,9 +50,14 @@ export default function ProfileScreen() {
     async function fetchProfile() {
       try {
         const userProfile = await api.getUserProfile();
-        if (userProfile && userProfile.profile) {
-          setEmailNotifications(userProfile.profile.email_notifications ?? true);
-          setReminders(userProfile.profile.reminders ?? true);
+        if (userProfile) {
+          setGoogleId(userProfile.google_id || null);
+          setAllowPasswordLogin(userProfile.allow_password_login ?? true);
+          setHasPassword(userProfile.has_password ?? false);
+          if (userProfile.profile) {
+            setEmailNotifications(userProfile.profile.email_notifications ?? true);
+            setReminders(userProfile.profile.reminders ?? true);
+          }
         }
       } catch (e) {
         console.error('Failed to fetch user profile', e);
@@ -68,6 +85,72 @@ export default function ProfileScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to update preferences');
+    }
+  }
+
+  async function handleToggleAllowPassword(checked: boolean) {
+    if (checked) {
+      if (!hasPassword) {
+        // If no password set, expand/show set password form
+        setShowSetPasswordForm(true);
+      } else {
+        // Already has password, just update settings in backend
+        setSettingsBusy(true);
+        try {
+          await api.updateAuthSettings(true);
+          setAllowPasswordLogin(true);
+          Alert.alert('Success', 'Email/password sign-in has been enabled.');
+        } catch (e: any) {
+          Alert.alert('Error', e.message || 'Failed to update authentication settings');
+        } finally {
+          setSettingsBusy(false);
+        }
+      }
+    } else {
+      // Toggle off password login
+      setSettingsBusy(true);
+      try {
+        await api.updateAuthSettings(false);
+        setAllowPasswordLogin(false);
+        Alert.alert('Success', 'Email/password sign-in has been disabled. You can only login with Google.');
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Failed to update authentication settings');
+      } finally {
+        setSettingsBusy(false);
+      }
+    }
+  }
+
+  async function handleSetPasswordSubmit() {
+    if (!setNewPass || !setConfirmPass) {
+      Alert.alert('Error', 'All fields are required.');
+      return;
+    }
+
+    if (setNewPass !== setConfirmPass) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (setNewPass.length < 4) {
+      Alert.alert('Error', 'Password must be at least 4 characters long');
+      return;
+    }
+
+    setSetPassBusy(true);
+    try {
+      // Empty current password as user does not have one
+      await api.changePassword('', setNewPass);
+      Alert.alert('Success', 'Password configured successfully! You can now log in using either Google or your email and password.');
+      setHasPassword(true);
+      setAllowPasswordLogin(true);
+      setShowSetPasswordForm(false);
+      setSetNewPass('');
+      setSetConfirmPass('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to set password');
+    } finally {
+      setSetPassBusy(false);
     }
   }
 
@@ -180,82 +263,179 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Password Card */}
-          <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.cardHeader}>
-              <Lock size={20} color="#10b981" style={{ marginRight: 8 }} />
-              <ThemedText type="smallBold">Change Password</ThemedText>
-            </View>
-            <View style={[styles.cardBody, { gap: Spacing.two }]}>
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold" style={styles.label}>Current Password</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      borderColor: theme.backgroundSelected,
-                      color: theme.text,
-                      backgroundColor: theme.backgroundElement,
-                    },
-                  ]}
-                  value={oldPassword}
-                  onChangeText={setOldPassword}
-                  secureTextEntry
-                  placeholder="Enter current password"
-                  placeholderTextColor={theme.textSecondary}
-                />
+          {/* Security Settings Card (Only for Google accounts) */}
+          {googleId && (
+            <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
+              <View style={styles.cardHeader}>
+                <Shield size={20} color="#f59e0b" style={{ marginRight: 8 }} />
+                <ThemedText type="smallBold">Security Settings</ThemedText>
               </View>
+              <View style={styles.cardBody}>
+                <View style={[styles.switchRow, { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.switchTitle} type="smallBold">Allow Password Sign-In</ThemedText>
+                    <ThemedText style={styles.switchDesc} themeColor="textSecondary">
+                      Enable logging in with both Google and your email/password.
+                    </ThemedText>
+                  </View>
+                  {settingsBusy ? (
+                    <ActivityIndicator size="small" color="#f59e0b" />
+                  ) : (
+                    <Switch value={allowPasswordLogin} onValueChange={handleToggleAllowPassword} />
+                  )}
+                </View>
 
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold" style={styles.label}>New Password</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      borderColor: theme.backgroundSelected,
-                      color: theme.text,
-                      backgroundColor: theme.backgroundElement,
-                    },
-                  ]}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry
-                  placeholder="Minimum 4 characters"
-                  placeholderTextColor={theme.textSecondary}
-                />
-              </View>
+                {/* Inline Set Password Form if they toggle on but don't have password yet */}
+                {showSetPasswordForm && !hasPassword && (
+                  <View style={{ marginTop: Spacing.two, gap: Spacing.two }}>
+                    <ThemedText type="small" style={{ color: '#f59e0b', fontWeight: 'bold' }}>
+                      Please set a password to enable email & password sign-in:
+                    </ThemedText>
+                    
+                    <View style={styles.inputGroup}>
+                      <ThemedText type="smallBold" style={styles.label}>New Password</ThemedText>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          {
+                            borderColor: theme.backgroundSelected,
+                            color: theme.text,
+                            backgroundColor: theme.backgroundElement,
+                          },
+                        ]}
+                        value={setNewPass}
+                        onChangeText={setSetNewPass}
+                        secureTextEntry
+                        placeholder="Minimum 4 characters"
+                        placeholderTextColor={theme.textSecondary}
+                      />
+                    </View>
 
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold" style={styles.label}>Confirm New Password</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      borderColor: theme.backgroundSelected,
-                      color: theme.text,
-                      backgroundColor: theme.backgroundElement,
-                    },
-                  ]}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                  placeholder="Repeat new password"
-                  placeholderTextColor={theme.textSecondary}
-                />
-              </View>
+                    <View style={styles.inputGroup}>
+                      <ThemedText type="smallBold" style={styles.label}>Confirm New Password</ThemedText>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          {
+                            borderColor: theme.backgroundSelected,
+                            color: theme.text,
+                            backgroundColor: theme.backgroundElement,
+                          },
+                        ]}
+                        value={setConfirmPass}
+                        onChangeText={setSetConfirmPass}
+                        secureTextEntry
+                        placeholder="Repeat password"
+                        placeholderTextColor={theme.textSecondary}
+                      />
+                    </View>
 
-              <TouchableOpacity
-                style={[styles.passwordButton, passwordBusy && { opacity: 0.7 }]}
-                onPress={handlePasswordChange}
-                disabled={passwordBusy}>
-                {passwordBusy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Update Password</ThemedText>
+                    <View style={{ flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one }}>
+                      <TouchableOpacity
+                        style={[styles.passwordButton, { flex: 1, backgroundColor: '#3c87f7', marginTop: 0 }, setPassBusy && { opacity: 0.7 }]}
+                        onPress={handleSetPasswordSubmit}
+                        disabled={setPassBusy}>
+                        {setPassBusy ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <ThemedText style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>Set & Enable</ThemedText>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.passwordButton, { flex: 1, backgroundColor: '#ef4444', marginTop: 0 }]}
+                        onPress={() => {
+                          setShowSetPasswordForm(false);
+                          setSetNewPass('');
+                          setSetConfirmPass('');
+                        }}
+                        disabled={setPassBusy}>
+                        <ThemedText style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>Cancel</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
-              </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
+
+          {/* Password Card (Only if they registered via email/password or have enabled password for Google) */}
+          {(!googleId || hasPassword) && (
+            <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
+              <View style={styles.cardHeader}>
+                <Lock size={20} color="#10b981" style={{ marginRight: 8 }} />
+                <ThemedText type="smallBold">Change Password</ThemedText>
+              </View>
+              <View style={[styles.cardBody, { gap: Spacing.two }]}>
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>Current Password</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      {
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                        backgroundColor: theme.backgroundElement,
+                      },
+                    ]}
+                    value={oldPassword}
+                    onChangeText={setOldPassword}
+                    secureTextEntry
+                    placeholder="Enter current password"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>New Password</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      {
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                        backgroundColor: theme.backgroundElement,
+                      },
+                    ]}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    placeholder="Minimum 4 characters"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>Confirm New Password</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      {
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                        backgroundColor: theme.backgroundElement,
+                      },
+                    ]}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                    placeholder="Repeat new password"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.passwordButton, passwordBusy && { opacity: 0.7 }]}
+                  onPress={handlePasswordChange}
+                  disabled={passwordBusy}>
+                  {passwordBusy ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Update Password</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Logout Button */}
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

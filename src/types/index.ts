@@ -36,6 +36,9 @@ export interface BaseUser {
   first_name: string;
   last_name: string;
   role: Role;
+  google_id?: string | null;
+  allow_password_login?: boolean;
+  has_password?: boolean;
 }
 
 export interface AuthSession {
@@ -97,3 +100,18 @@ export interface StreakRule {
   created_at: string;
   updated_at: string;
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatQuery {
+  message: string;
+  chat_history?: ChatMessage[];
+}
+
+export interface ChatReply {
+  reply: string;
+}
+

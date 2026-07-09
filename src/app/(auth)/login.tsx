@@ -34,8 +34,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
 
-  const [email, setEmail] = useState('user@demo.com');
-  const [password, setPassword] = useState('demo');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [busyGoogle, setBusyGoogle] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');

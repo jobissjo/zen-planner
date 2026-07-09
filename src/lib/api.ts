@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { ApiResponse, AuthSession, Task, User, WeeklyStats, Motivation, Reward, UserStreak, StreakDayStatus, StreakRule } from "../types";
+import type { ApiResponse, AuthSession, Task, User, WeeklyStats, Motivation, Reward, UserStreak, StreakDayStatus, StreakRule, ChatMessage, ChatReply } from "../types";
 import { mockDb } from "./mock-db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -518,6 +518,53 @@ export const api = {
     if (payload.status !== "success") {
       throw new Error(payload.message || "Failed to update notification preferences");
     }
+  },
+
+  async updateAuthSettings(allowPasswordLogin: boolean): Promise<void> {
+    let response;
+    try {
+      response = await client.patch("/api/v1/user/auth-settings", {
+        allow_password_login: allowPasswordLogin,
+      });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = (error.response?.data as { message?: string } | undefined)?.message;
+        throw new Error(message || error.message);
+      }
+      throw error;
+    }
+    const payload = response.data as ApiResponse<null>;
+    if (payload.status !== "success") {
+      throw new Error(payload.message || "Failed to update authentication settings");
+    }
+  },
+
+  async chatWithBot(message: string, chatHistory?: ChatMessage[]): Promise<ChatReply> {
+    let response;
+    try {
+      const localDate = new Date();
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      response = await client.post("/api/v1/chatbot/chat", {
+        message,
+        chat_history: chatHistory,
+        current_date: todayStr,
+      });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = (error.response?.data as { message?: string } | undefined)?.message;
+        throw new Error(message || error.message);
+      }
+      throw error;
+    }
+    const payload = response.data as ApiResponse<ChatReply>;
+    if (payload.status !== "success") {
+      throw new Error(payload.message || "Failed to get chatbot reply");
+    }
+    return payload.data;
   },
 
   async getUserStreak(today: string): Promise<UserStreak> {

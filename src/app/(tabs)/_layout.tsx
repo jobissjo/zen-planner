@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Calendar, User } from 'lucide-react-native';
+import { Home, Calendar, User, Sparkles } from 'lucide-react-native';
 
 import { useTheme } from '@/hooks/use-theme';
 
@@ -36,6 +36,13 @@ export default function TabsLayout() {
         options={{
           title: 'Planner',
           tabBarIcon: ({ color, size }) => <Calendar size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chatbot"
+        options={{
+          title: 'Zen AI',
+          tabBarIcon: ({ color, size }) => <Sparkles size={size} color={color} />,
         }}
       />
       <Tabs.Screen

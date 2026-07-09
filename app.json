@@ -48,6 +48,13 @@
           "icon": "./assets/images/icon.png",
           "color": "#208AEF"
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Zen Planner to use the microphone.",
+          "speechRecognitionPermission": "Allow Zen Planner to securely recognize your speech."
+        }
       ]
     ],
     "experiments": {

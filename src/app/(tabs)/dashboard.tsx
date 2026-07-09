@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +25,10 @@ import {
   Plus,
   Trash2,
   X,
+  Volume2,
+  Square,
 } from 'lucide-react-native';
+import * as Speech from 'expo-speech';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -46,6 +50,19 @@ export default function DashboardScreen() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [motivation, setMotivation] = useState<string | null>(null);
   const [loadingMotivation, setLoadingMotivation] = useState(false);
+  
+  // Audio Briefing State
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [loadingBrief, setLoadingBrief] = useState(false);
+
+  // Stop speaking when leaving the dashboard screen
+  useEffect(() => {
+    return () => {
+      try {
+        Speech.stop();
+      } catch {}
+    };
+  }, []);
 
   // Reward Modal State
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
@@ -158,6 +175,76 @@ export default function DashboardScreen() {
       setRewards(rewards.filter((r) => r.id !== id));
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async function handleAudioBriefing() {
+    if (isSpeaking) {
+      try {
+        await Speech.stop();
+        setIsSpeaking(false);
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
+
+    setLoadingBrief(true);
+    try {
+      // 1. Gather context
+      const todayTasks = tasks.filter((t) => t.date === todayStr);
+      const highPriority = todayTasks.filter((t) => t.priority === 'high' && t.status !== 'completed');
+      const pendingCount = todayTasks.filter((t) => t.status !== 'completed').length;
+      
+      const taskDescription = todayTasks.length > 0 
+        ? `You have ${todayTasks.length} tasks today. ${todayTasks.length - pendingCount} are already completed. ${highPriority.length > 0 ? `Your high-priority tasks are: ${highPriority.map(t => t.title).join(', ')}.` : ''}`
+        : "You have no tasks scheduled for today.";
+
+      const motivationText = motivation ? `Your daily zen thought is: "${motivation}".` : '';
+
+      const prompt = `Please write a short, calming daily zen briefing for the user named ${session?.user?.first_name || 'Planner'}. 
+Here is their planning context:
+- Tasks today: ${taskDescription}
+- Current habit streak: ${streak?.current_streak ?? 0} days
+- Available streak freezes: ${streak?.available_freezes ?? 0}
+- Motivation quote: ${motivationText}
+
+Guidelines:
+- Write it in 2-3 sentences.
+- Keep the tone very peaceful, encouraging, and warm (ideal for reading aloud).
+- Start with a pleasant greeting (e.g. "Good morning/afternoon/evening, [Name]").
+- Summarize today's agenda briefly and end with a short encouraging zen thought.
+- Return ONLY the paragraph of the briefing itself, without any introductory text or symbols.`;
+
+      // 2. Call the AI assistant to summarize it beautifully
+      let briefingText = "";
+      try {
+        const aiResponse = await api.chatWithBot(prompt, []);
+        briefingText = aiResponse.reply;
+      } catch (err) {
+        console.error("AI briefing generation failed, using fallback:", err);
+        // Fallback local text
+        briefingText = `Hello ${session?.user?.first_name || 'Planner'}. Today you have ${todayTasks.length} tasks planned, with ${pendingCount} remaining. Your current streak is ${streak?.current_streak ?? 0} days. ${motivation ? `Remember: ${motivation}` : 'Keep showing up for yourself.'} Have a calm and productive day.`;
+      }
+
+      // Clean up markdown bold markers or brackets
+      const cleanSpeechText = briefingText.replace(/\*\*/g, '').replace(/`/g, '');
+
+      // 3. Play it
+      setIsSpeaking(true);
+      Speech.speak(cleanSpeechText, {
+        onDone: () => setIsSpeaking(false),
+        onStopped: () => setIsSpeaking(false),
+        onError: (e) => {
+          console.error("Speech playback error:", e);
+          setIsSpeaking(false);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not play daily briefing.");
+    } finally {
+      setLoadingBrief(false);
     }
   }
 
@@ -286,6 +373,43 @@ export default function DashboardScreen() {
               </ThemedText>
             </TouchableOpacity>
           </View>
+
+          {/* Zen Audio Briefing Card */}
+          <TouchableOpacity
+            style={[
+              styles.briefingCard,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: isSpeaking ? '#3c87f7' : theme.backgroundSelected,
+              },
+            ]}
+            onPress={handleAudioBriefing}
+            disabled={loadingBrief}
+          >
+            <View style={styles.briefingContent}>
+              <View style={[styles.briefingIconContainer, { backgroundColor: isSpeaking ? '#3c87f715' : theme.backgroundSelected }]}>
+                {loadingBrief ? (
+                  <ActivityIndicator size="small" color="#3c87f7" />
+                ) : isSpeaking ? (
+                  <Square size={16} color="#3c87f7" fill="#3c87f7" />
+                ) : (
+                  <Volume2 size={20} color={theme.text} />
+                )}
+              </View>
+              <View style={styles.briefingTextContainer}>
+                <ThemedText type="smallBold" style={styles.briefingTitle}>
+                  {isSpeaking ? 'Briefing Active...' : 'Zen Audio Briefing'}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.briefingDesc}>
+                  {isSpeaking 
+                    ? 'Tap to stop reading.' 
+                    : loadingBrief 
+                      ? 'AI is creating your brief summary...' 
+                      : 'Listen to a calm, AI-summarized briefing of your day.'}
+                </ThemedText>
+              </View>
+            </View>
+          </TouchableOpacity>
 
           {/* Motivation Quote */}
           {motivation && (
@@ -983,5 +1107,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.one,
+  },
+  briefingCard: {
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    padding: Spacing.three,
+    marginBottom: Spacing.three,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  briefingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  briefingIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  briefingTextContainer: {
+    flex: 1,
+  },
+  briefingTitle: {
+    fontSize: 15,
+  },
+  briefingDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
