@@ -37,6 +37,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api, getWeekRange, ymd } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { Task, Reward, StreakDayStatus, UserStreak } from '@/types';
+import { GlassCard } from '@/components/glass-card';
 
 export default function DashboardScreen() {
   const { session } = useAuth();
@@ -376,46 +377,46 @@ Guidelines:
 
           {/* Zen Audio Briefing Card */}
           <TouchableOpacity
-            style={[
-              styles.briefingCard,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderColor: isSpeaking ? '#3c87f7' : theme.backgroundSelected,
-              },
-            ]}
             onPress={handleAudioBriefing}
             disabled={loadingBrief}
           >
-            <View style={styles.briefingContent}>
-              <View style={[styles.briefingIconContainer, { backgroundColor: isSpeaking ? '#3c87f715' : theme.backgroundSelected }]}>
-                {loadingBrief ? (
-                  <ActivityIndicator size="small" color="#3c87f7" />
-                ) : isSpeaking ? (
-                  <Square size={16} color="#3c87f7" fill="#3c87f7" />
-                ) : (
-                  <Volume2 size={20} color={theme.text} />
-                )}
+            <GlassCard
+              style={[
+                styles.briefingCard,
+                isSpeaking && { borderColor: '#3c87f7' },
+              ]}
+            >
+              <View style={styles.briefingContent}>
+                <View style={[styles.briefingIconContainer, { backgroundColor: isSpeaking ? '#3c87f715' : theme.backgroundSelected }]}>
+                  {loadingBrief ? (
+                    <ActivityIndicator size="small" color="#3c87f7" />
+                  ) : isSpeaking ? (
+                    <Square size={16} color="#3c87f7" fill="#3c87f7" />
+                  ) : (
+                    <Volume2 size={20} color={theme.text} />
+                  )}
+                </View>
+                <View style={styles.briefingTextContainer}>
+                  <ThemedText type="smallBold" style={styles.briefingTitle}>
+                    {isSpeaking ? 'Briefing Active...' : 'Zen Audio Briefing'}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.briefingDesc}>
+                    {isSpeaking 
+                      ? 'Tap to stop reading.' 
+                      : loadingBrief 
+                        ? 'AI is creating your brief summary...' 
+                        : 'Listen to a calm, AI-summarized briefing of your day.'}
+                  </ThemedText>
+                </View>
               </View>
-              <View style={styles.briefingTextContainer}>
-                <ThemedText type="smallBold" style={styles.briefingTitle}>
-                  {isSpeaking ? 'Briefing Active...' : 'Zen Audio Briefing'}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.briefingDesc}>
-                  {isSpeaking 
-                    ? 'Tap to stop reading.' 
-                    : loadingBrief 
-                      ? 'AI is creating your brief summary...' 
-                      : 'Listen to a calm, AI-summarized briefing of your day.'}
-                </ThemedText>
-              </View>
-            </View>
+            </GlassCard>
           </TouchableOpacity>
 
           {/* Motivation Quote */}
           {motivation && (
-            <View style={[styles.motivationCard, { backgroundColor: '#3c87f710', borderColor: '#3c87f730' }]}>
+            <GlassCard style={[styles.motivationCard, { backgroundColor: 'rgba(60, 135, 247, 0.08)', borderColor: '#3c87f725' }]}>
               <ThemedText style={styles.motivationText}>{"\""}{motivation}{"\""}</ThemedText>
-            </View>
+            </GlassCard>
           )}
 
           {/* Stats Grid */}
@@ -429,18 +430,18 @@ Guidelines:
           </View>
 
           {/* Heatmap Section */}
-          <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+          <GlassCard style={styles.card}>
             <View style={styles.cardHeader}>
               <Flame size={20} color="#ef4444" style={{ marginRight: 8 }} />
               <ThemedText type="smallBold">Streak Activity Heatmap</ThemedText>
             </View>
             <View style={styles.cardBody}>{renderHeatmap()}</View>
-          </View>
+          </GlassCard>
 
           {/* Progress and Reward Row */}
           <View style={styles.progressRow}>
             {/* Weekly Progress Card */}
-            <View style={[styles.card, { flex: 1, backgroundColor: theme.backgroundElement }]}>
+            <GlassCard style={[styles.card, { flex: 1 }]}>
               <View style={styles.cardHeader}>
                 <TrendingUp size={20} color="#3c87f7" style={{ marginRight: 8 }} />
                 <ThemedText type="smallBold">Weekly Progress</ThemedText>
@@ -474,10 +475,10 @@ Guidelines:
                   })}
                 </View>
               </View>
-            </View>
+            </GlassCard>
 
             {/* Reward Target Card */}
-            <View style={[styles.card, { flex: 1, backgroundColor: theme.backgroundElement }]}>
+            <GlassCard style={[styles.card, { flex: 1 }]}>
               <View style={styles.cardHeader}>
                 <Star size={20} color="#f59e0b" style={{ marginRight: 8 }} />
                 <ThemedText type="smallBold">Weekly Reward</ThemedText>
@@ -485,7 +486,7 @@ Guidelines:
               <View style={styles.cardBody}>
                 {favoriteReward ? (
                   <>
-                    <ThemedText style={styles.rewardTitle} numberOfLines={1}>
+                     <ThemedText style={styles.rewardTitle} numberOfLines={1}>
                       {favoriteReward.title}
                     </ThemedText>
                     <ThemedText style={styles.rewardDesc} numberOfLines={2} themeColor="textSecondary">
@@ -519,7 +520,7 @@ Guidelines:
                   </ThemedText>
                 </TouchableOpacity>
               </View>
-            </View>
+            </GlassCard>
           </View>
 
           {/* Tasks Lists */}
@@ -674,7 +675,7 @@ Guidelines:
 // Subcomponents
 function StatCard({ label, value, icon }: { label: string; value: string | number; icon: any }) {
   return (
-    <View style={styles.statCard}>
+    <GlassCard style={styles.statCard}>
       <View style={styles.statHeader}>
         <ThemedText style={styles.statLabel} themeColor="textSecondary">
           {label}
@@ -682,7 +683,7 @@ function StatCard({ label, value, icon }: { label: string; value: string | numbe
         {icon}
       </View>
       <ThemedText style={styles.statVal}>{value}</ThemedText>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -713,7 +714,7 @@ function TaskList({
   };
 
   return (
-    <View style={[styles.taskListCard, { backgroundColor: theme.backgroundElement }]}>
+    <GlassCard style={styles.taskListCard}>
       <ThemedText type="smallBold" style={styles.taskListTitle}>
         {title}
       </ThemedText>
@@ -767,7 +768,7 @@ function TaskList({
           ))
         )}
       </View>
-    </View>
+    </GlassCard>
   );
 }
 

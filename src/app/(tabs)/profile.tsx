@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Bell, Lock, LogOut, BadgeCheck, Shield } from 'lucide-react-native';
+import { User, Bell, Lock, LogOut, BadgeCheck, Shield, Palette, Sun, Moon, Monitor } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,10 +19,13 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
+import { useThemeMode } from '@/context/theme-context';
+import { GlassCard } from '@/components/glass-card';
 
 export default function ProfileScreen() {
   const { session, logout } = useAuth();
   const theme = useTheme();
+  const { themeMode, setThemeMode } = useThemeMode();
 
   // State
   const [profileLoading, setProfileLoading] = useState(true);
@@ -211,7 +214,7 @@ export default function ProfileScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* User Info Card */}
-          <View style={[styles.profileCard, { backgroundColor: theme.backgroundElement }]}>
+          <GlassCard style={styles.profileCard}>
             <View style={styles.avatarRow}>
               <View style={[styles.avatar, { backgroundColor: '#3c87f7' }]}>
                 <ThemedText style={styles.avatarText}>{initials}</ThemedText>
@@ -231,10 +234,10 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-          </View>
+          </GlassCard>
 
           {/* Notifications Card */}
-          <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
+          <GlassCard style={styles.settingsCard}>
             <View style={styles.cardHeader}>
               <Bell size={20} color="#3c87f7" style={{ marginRight: 8 }} />
               <ThemedText type="smallBold">Notification Preferences</ThemedText>
@@ -261,11 +264,55 @@ export default function ProfileScreen() {
                 </View>
               </View>
             )}
-          </View>
+          </GlassCard>
+
+          {/* Theme Preference Card */}
+          <GlassCard style={styles.settingsCard}>
+            <View style={styles.cardHeader}>
+              <Palette size={20} color="#3c87f7" style={{ marginRight: 8 }} />
+              <ThemedText type="smallBold">Theme Preferences</ThemedText>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={styles.themeSelectorRow}>
+                {(['system', 'light', 'dark'] as const).map((mode) => {
+                  const isActive = themeMode === mode;
+                  const IconComponent = mode === 'system' ? Monitor : mode === 'light' ? Sun : Moon;
+                  return (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[
+                        styles.themeButton,
+                        isActive && {
+                          backgroundColor: '#3c87f7',
+                          borderColor: '#3c87f7',
+                        },
+                        !isActive && {
+                          backgroundColor: theme.backgroundSelected,
+                          borderColor: theme.backgroundSelected,
+                        }
+                      ]}
+                      onPress={() => setThemeMode(mode)}
+                    >
+                      <IconComponent size={16} color={isActive ? '#fff' : theme.text} style={{ marginRight: 6 }} />
+                      <ThemedText
+                        style={[
+                          styles.themeButtonText,
+                          { color: isActive ? '#fff' : theme.text }
+                        ]}
+                        type="smallBold"
+                      >
+                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </GlassCard>
 
           {/* Security Settings Card (Only for Google accounts) */}
           {googleId && (
-            <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
+            <GlassCard style={styles.settingsCard}>
               <View style={styles.cardHeader}>
                 <Shield size={20} color="#f59e0b" style={{ marginRight: 8 }} />
                 <ThemedText type="smallBold">Security Settings</ThemedText>
@@ -355,12 +402,12 @@ export default function ProfileScreen() {
                   </View>
                 )}
               </View>
-            </View>
+            </GlassCard>
           )}
 
           {/* Password Card (Only if they registered via email/password or have enabled password for Google) */}
           {(!googleId || hasPassword) && (
-            <View style={[styles.settingsCard, { backgroundColor: theme.backgroundElement }]}>
+            <GlassCard style={styles.settingsCard}>
               <View style={styles.cardHeader}>
                 <Lock size={20} color="#10b981" style={{ marginRight: 8 }} />
                 <ThemedText type="smallBold">Change Password</ThemedText>
@@ -434,7 +481,7 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
+            </GlassCard>
           )}
 
           {/* Logout Button */}
@@ -556,5 +603,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.two,
+  },
+  themeSelectorRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+    justifyContent: 'space-between',
+  },
+  themeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+    borderRadius: Spacing.one,
+    borderWidth: 1,
+  },
+  themeButtonText: {
+    fontSize: 13,
   },
 });

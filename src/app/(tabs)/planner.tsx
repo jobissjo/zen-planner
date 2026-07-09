@@ -31,6 +31,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api, getWeekRange, ymd } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { Task } from '@/types';
+import { GlassCard } from '@/components/glass-card';
 
 export default function PlannerScreen() {
   const theme = useTheme();
@@ -227,11 +228,10 @@ export default function PlannerScreen() {
             const isToday = dayStr === ymd(new Date());
 
             return (
-              <View
+              <GlassCard
                 key={dayStr}
                 style={[
                   styles.dayCard,
-                  { backgroundColor: theme.backgroundElement },
                   isToday && { borderColor: '#3c87f7', borderWidth: 1.5 },
                 ]}>
                 {/* Day Header */}
@@ -298,6 +298,7 @@ export default function PlannerScreen() {
                                 </View>
                               )}
                             </View>
+                            
                             {t.status !== 'skipped' && t.status !== 'completed' && (
                               <TouchableOpacity style={styles.skipButton} onPress={() => handleSkipTask(t)}>
                                 <ThemedText type="code" style={styles.skipButtonText} themeColor="textSecondary">
@@ -321,7 +322,7 @@ export default function PlannerScreen() {
                     ))
                   )}
                 </View>
-              </View>
+              </GlassCard>
             );
           })}
         </ScrollView>

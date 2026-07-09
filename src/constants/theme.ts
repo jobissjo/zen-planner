@@ -14,6 +14,9 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    backgroundGlass: 'rgba(255, 255, 255, 0.45)',
+    borderGlass: 'rgba(0, 0, 0, 0.06)',
+    glassTint: '#ffffff',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +24,9 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    backgroundGlass: 'rgba(33, 34, 37, 0.55)',
+    borderGlass: 'rgba(255, 255, 255, 0.08)',
+    glassTint: '#212225',
   },
 } as const;
 

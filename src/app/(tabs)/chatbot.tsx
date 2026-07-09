@@ -39,6 +39,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { ChatMessage } from '@/types';
+import { GlassCard } from '@/components/glass-card';
 
 const SUGGESTIONS = [
   { label: "Show today's tasks", text: "List my tasks for today" },
@@ -344,12 +345,12 @@ export default function ChatbotScreen() {
             <Bot size={14} color="#3c87f7" />
           )}
         </View>
-        <View style={[
+        <GlassCard style={[
           styles.bubble,
-          isUser ? [styles.userBubble, { backgroundColor: '#3c87f7' }] : [styles.botBubble, { backgroundColor: theme.backgroundElement }]
+          isUser ? [styles.userBubble, { backgroundColor: '#3c87f7', borderColor: '#3c87f7' }] : [styles.botBubble]
         ]}>
           <FormattedMessage text={item.content} textColor={isUser ? '#ffffff' : theme.text} />
-        </View>
+        </GlassCard>
       </View>
     );
   };
@@ -393,10 +394,10 @@ export default function ChatbotScreen() {
                   <View style={[styles.avatar, styles.botAvatar, { backgroundColor: theme.backgroundSelected }]}>
                     <Bot size={14} color="#3c87f7" />
                   </View>
-                  <View style={[styles.bubble, styles.botBubble, styles.loadingBubble, { backgroundColor: theme.backgroundElement }]}>
+                  <GlassCard style={[styles.bubble, styles.botBubble, styles.loadingBubble]}>
                     <ActivityIndicator size="small" color="#3c87f7" style={{ marginRight: 8 }} />
                     <ThemedText type="small" themeColor="textSecondary">AI is working...</ThemedText>
-                  </View>
+                  </GlassCard>
                 </View>
               )}
 
@@ -410,12 +411,13 @@ export default function ChatbotScreen() {
                     {SUGGESTIONS.map((s, idx) => (
                       <TouchableOpacity
                         key={idx}
-                        style={[styles.suggestionChip, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}
                         onPress={() => handleSend(s.text)}
                       >
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.suggestionText}>
-                          {s.label}
-                        </ThemedText>
+                        <GlassCard style={[styles.suggestionChip, { borderColor: theme.borderGlass }]}>
+                          <ThemedText type="small" themeColor="textSecondary" style={styles.suggestionText}>
+                            {s.label}
+                          </ThemedText>
+                        </GlassCard>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -426,7 +428,7 @@ export default function ChatbotScreen() {
         />
 
         {/* Input Panel */}
-        <ThemedView style={[styles.inputPanel, { borderTopColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+        <GlassCard style={[styles.inputPanel, { borderTopWidth: 1, borderTopColor: theme.borderGlass, borderLeftWidth: 0, borderRightWidth: 0, borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
           <View style={styles.inputContainer}>
             <TextInput
               style={[
@@ -476,7 +478,7 @@ export default function ChatbotScreen() {
               <Send size={18} color={(isLoading || !input.trim() || isListening) ? theme.textSecondary : '#fff'} />
             </TouchableOpacity>
           </View>
-        </ThemedView>
+        </GlassCard>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -7,11 +7,13 @@ import type { Notification, NotificationResponse } from 'expo-notifications';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
+import { AppThemeProvider, useThemeMode } from '@/context/theme-context';
+
 function RootLayoutNav() {
   const { session, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
-  const colorScheme = useColorScheme();
+  const { resolvedTheme } = useThemeMode();
 
   useEffect(() => {
     // Listen for notifications arriving while the app is in the foreground
@@ -57,7 +59,7 @@ function RootLayoutNav() {
   }, [session, loading, segments]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={resolvedTheme === 'dark' ? DarkTheme : DefaultTheme}>
       {loading && <AnimatedSplashOverlay />}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
@@ -66,14 +68,15 @@ function RootLayoutNav() {
         <Stack.Screen name="admin" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
-
   );
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <AppThemeProvider>
+        <RootLayoutNav />
+      </AppThemeProvider>
     </AuthProvider>
   );
 }
