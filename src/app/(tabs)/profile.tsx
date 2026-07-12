@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -8,10 +8,11 @@ import {
   Switch,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Bell, Lock, LogOut, BadgeCheck, Shield, Palette, Sun, Moon, Monitor } from 'lucide-react-native';
+import { User, Bell, Lock, LogOut, BadgeCheck, Shield, Palette, Sun, Moon, Monitor, Sparkles, Clock, MessageSquare, ChevronRight, X, Circle } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +22,7 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import { useThemeMode } from '@/context/theme-context';
 import { GlassCard } from '@/components/glass-card';
+import type { Task, FeedbackType } from '@/types';
 
 export default function ProfileScreen() {
   const { session, logout } = useAuth();
@@ -48,6 +50,74 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
+
+  // Pending Tasks State
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
+  const [fetchingPending, setFetchingPending] = useState(false);
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
+
+  // Feedback Form State
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>('feedback');
+  const [feedbackTitle, setFeedbackTitle] = useState('');
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  const fetchPendingTasks = useCallback(async () => {
+    try {
+      const allTasks = await api.listTasks();
+      const pending = allTasks.filter((t) => t.status === 'pending');
+      setPendingTasks(pending);
+    } catch (e) {
+      console.error('Failed to fetch pending tasks', e);
+    }
+  }, []);
+
+  async function handleCompletePendingTask(t: Task) {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      await api.updateTask(t.id, { status: 'completed', completedDate: todayStr });
+      setPendingTasks((prev) => prev.filter((item) => item.id !== t.id));
+      Alert.alert('Success', `Task "${t.title}" marked as completed!`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to complete task');
+    }
+  }
+
+  async function handleSkipPendingTask(t: Task) {
+    try {
+      await api.updateTask(t.id, { status: 'skipped' });
+      setPendingTasks((prev) => prev.filter((item) => item.id !== t.id));
+      Alert.alert('Success', `Task "${t.title}" skipped!`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to skip task');
+    }
+  }
+
+  async function handleSubmitFeedback() {
+    if (!feedbackTitle.trim() || !feedbackContent.trim()) {
+      Alert.alert('Error', 'Please fill in both Subject and Details.');
+      return;
+    }
+    setSubmittingFeedback(true);
+    try {
+      await api.submitFeedback(feedbackType, feedbackTitle, feedbackContent);
+      Alert.alert('Success', 'Feedback submitted! Thank you for helping us improve Zen Planner. 🧘');
+      setFeedbackTitle('');
+      setFeedbackContent('');
+      setFeedbackType('feedback');
+      setFeedbackModalOpen(false);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to submit feedback');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPendingTasks();
+  }, [fetchPendingTasks]);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -310,6 +380,57 @@ export default function ProfileScreen() {
             </View>
           </GlassCard>
 
+          {/* Utilities & Feedback Card */}
+          <GlassCard style={styles.settingsCard}>
+            <View style={styles.cardHeader}>
+              <Sparkles size={20} color="#3c87f7" style={{ marginRight: 8 }} />
+              <ThemedText type="smallBold">App Utilities</ThemedText>
+            </View>
+            <View style={styles.cardBody}>
+              {/* Pending Tasks button */}
+              <TouchableOpacity
+                style={[styles.menuRow, { borderColor: theme.backgroundSelected }]}
+                onPress={async () => {
+                  setFetchingPending(true);
+                  setPendingModalOpen(true);
+                  try {
+                    await fetchPendingTasks();
+                  } finally {
+                    setFetchingPending(false);
+                  }
+                }}
+              >
+                <View style={styles.menuRowLeft}>
+                  <Clock size={18} color={theme.textSecondary} style={{ marginRight: 10 }} />
+                  <ThemedText style={styles.menuRowText}>Pending Tasks</ThemedText>
+                </View>
+                {/* Arrow or badge */}
+                <View style={styles.menuRowRight}>
+                  {pendingTasks.length > 0 && (
+                    <View style={styles.badge}>
+                      <ThemedText style={styles.badgeText}>{pendingTasks.length}</ThemedText>
+                    </View>
+                  )}
+                  <ChevronRight size={16} color={theme.textSecondary} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Feedback button */}
+              <TouchableOpacity
+                style={[styles.menuRow, { borderBottomWidth: 0 }]}
+                onPress={() => setFeedbackModalOpen(true)}
+              >
+                <View style={styles.menuRowLeft}>
+                  <MessageSquare size={18} color={theme.textSecondary} style={{ marginRight: 10 }} />
+                  <ThemedText style={styles.menuRowText}>Send Feedback & Suggestions</ThemedText>
+                </View>
+                <View style={styles.menuRowRight}>
+                  <ChevronRight size={16} color={theme.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+
           {/* Security Settings Card (Only for Google accounts) */}
           {googleId && (
             <GlassCard style={styles.settingsCard}>
@@ -490,6 +611,162 @@ export default function ProfileScreen() {
             <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Sign Out</ThemedText>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Pending Tasks Modal */}
+        <Modal visible={pendingModalOpen} animationType="slide" transparent>
+          <ThemedView style={styles.modalBg}>
+            <SafeAreaView style={styles.modalSafeArea}>
+              <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+                <View style={styles.modalHeader}>
+                  <ThemedText type="subtitle">Pending Tasks</ThemedText>
+                  <TouchableOpacity onPress={() => setPendingModalOpen(false)}>
+                    <X size={24} color={theme.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {fetchingPending ? (
+                  <ActivityIndicator style={{ flex: 1 }} color="#3c87f7" size="large" />
+                ) : pendingTasks.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+                      All caught up! No pending tasks. 🧘
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ScrollView contentContainerStyle={styles.modalFormScroll} showsVerticalScrollIndicator={false}>
+                    {pendingTasks.map((t) => (
+                      <View key={t.id} style={[styles.taskItem, { borderColor: theme.backgroundSelected }]}>
+                        <View style={styles.taskLeft}>
+                          {/* Complete Checkbox */}
+                          <TouchableOpacity onPress={() => handleCompletePendingTask(t)} style={styles.checkbox}>
+                            <Circle size={18} color={theme.textSecondary} />
+                          </TouchableOpacity>
+
+                          <View style={{ flex: 1 }}>
+                            <ThemedText style={styles.taskTitle}>{t.title}</ThemedText>
+                            <View style={styles.taskMetaRow}>
+                              <Clock size={11} color={theme.textSecondary} style={{ marginRight: 3 }} />
+                              <ThemedText type="code" style={styles.taskMetaText}>
+                                {t.date} · {t.startTime}–{t.endTime}
+                              </ThemedText>
+                            </View>
+                            
+                            <TouchableOpacity style={styles.skipButton} onPress={() => handleSkipPendingTask(t)}>
+                              <ThemedText type="code" style={styles.skipButtonText} themeColor="textSecondary">
+                                Skip Task
+                              </ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            </SafeAreaView>
+          </ThemedView>
+        </Modal>
+
+        {/* Feedback Modal */}
+        <Modal visible={feedbackModalOpen} animationType="slide" transparent>
+          <ThemedView style={styles.modalBg}>
+            <SafeAreaView style={styles.modalSafeArea}>
+              <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+                <View style={styles.modalHeader}>
+                  <ThemedText type="subtitle">Send Feedback</ThemedText>
+                  <TouchableOpacity onPress={() => setFeedbackModalOpen(false)}>
+                    <X size={24} color={theme.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.modalFormScroll} showsVerticalScrollIndicator={false}>
+                  {/* Category Selection */}
+                  <View style={styles.inputGroup}>
+                    <ThemedText type="smallBold" style={styles.label}>Feedback Category</ThemedText>
+                    <View style={styles.categoryContainer}>
+                      {(['feedback', 'suggestion', 'report', 'appreciation'] as const).map((cat) => {
+                        const isActive = feedbackType === cat;
+                        return (
+                          <TouchableOpacity
+                            key={cat}
+                            style={[
+                              styles.categoryBtn,
+                              { borderColor: theme.backgroundSelected },
+                              isActive && { backgroundColor: '#3c87f7', borderColor: '#3c87f7' }
+                            ]}
+                            onPress={() => setFeedbackType(cat)}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.categoryBtnText,
+                                { color: isActive ? '#fff' : theme.text }
+                              ]}
+                            >
+                              {cat}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Subject */}
+                  <View style={styles.inputGroup}>
+                    <ThemedText type="smallBold" style={styles.label}>Subject</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        {
+                          borderColor: theme.backgroundSelected,
+                          color: theme.text,
+                          backgroundColor: theme.backgroundElement,
+                        },
+                      ]}
+                      value={feedbackTitle}
+                      onChangeText={setFeedbackTitle}
+                      placeholder="Brief summary..."
+                      placeholderTextColor={theme.textSecondary}
+                    />
+                  </View>
+
+                  {/* Details */}
+                  <View style={styles.inputGroup}>
+                    <ThemedText type="smallBold" style={styles.label}>Details</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        styles.textArea,
+                        {
+                          borderColor: theme.backgroundSelected,
+                          color: theme.text,
+                          backgroundColor: theme.backgroundElement,
+                        },
+                      ]}
+                      value={feedbackContent}
+                      onChangeText={setFeedbackContent}
+                      multiline
+                      numberOfLines={4}
+                      placeholder="Describe your request, issue, or feedback..."
+                      placeholderTextColor={theme.textSecondary}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={handleSubmitFeedback}
+                    disabled={submittingFeedback}
+                  >
+                    {submittingFeedback ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <ThemedText style={styles.saveButtonText}>Send Feedback</ThemedText>
+                    )}
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+            </SafeAreaView>
+          </ThemedView>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -621,5 +898,150 @@ const styles = StyleSheet.create({
   },
   themeButtonText: {
     fontSize: 13,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.three,
+    borderBottomWidth: 1,
+  },
+  menuRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  menuRowText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  badge: {
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  categoryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  categoryBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: '#00000060',
+  },
+  modalSafeArea: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    height: '80%',
+    borderTopLeftRadius: Spacing.three,
+    borderTopRightRadius: Spacing.three,
+    padding: Spacing.four,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#00000010',
+    paddingBottom: Spacing.three,
+    marginBottom: Spacing.two,
+  },
+  modalFormScroll: {
+    paddingBottom: Spacing.six,
+    gap: Spacing.three,
+  },
+  textArea: {
+    height: 100,
+    paddingTop: Spacing.two,
+    textAlignVertical: 'top',
+  },
+  saveButton: {
+    height: 50,
+    backgroundColor: '#3c87f7',
+    borderRadius: Spacing.one,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.three,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing.four,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    paddingVertical: Spacing.three,
+    gap: Spacing.two,
+  },
+  taskLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    gap: Spacing.two,
+  },
+  checkbox: {
+    marginTop: 2,
+  },
+  taskTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  taskMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.half,
+    gap: Spacing.one,
+  },
+  taskMetaText: {
+    fontSize: 11,
+  },
+  skipButton: {
+    marginTop: Spacing.one,
+    alignSelf: 'flex-start',
+  },
+  skipButtonText: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: 'bold',
   },
 });

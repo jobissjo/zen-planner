@@ -17,6 +17,7 @@ export type GlassCardProps = ViewProps & {
 
 export function GlassCard({ style, children, intensity = 'light', ...rest }: GlassCardProps) {
   const theme = useTheme();
+  const isLightMode = theme.background === '#ffffff';
 
   const fallbackStyle = [
     styles.glassFallback,
@@ -29,6 +30,11 @@ export function GlassCard({ style, children, intensity = 'light', ...rest }: Gla
       WebkitBackdropFilter: intensity === 'light' ? 'blur(8px)' : 'blur(16px)',
     },
     style,
+    // Avoid harsh dark grey outlines from elevation shadows in light mode
+    isLightMode && {
+      elevation: 0,
+      shadowOpacity: 0.01,
+    },
   ];
 
   if (isNativeGlassSupported) {
@@ -45,6 +51,10 @@ export function GlassCard({ style, children, intensity = 'light', ...rest }: Gla
             backgroundColor: theme.backgroundGlass,
           },
           style,
+          isLightMode && {
+            elevation: 0,
+            shadowOpacity: 0.01,
+          },
         ]}
         {...rest}
       >

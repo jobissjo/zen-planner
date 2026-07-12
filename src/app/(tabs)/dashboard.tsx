@@ -27,6 +27,7 @@ import {
   X,
   Volume2,
   Square,
+  Megaphone,
 } from 'lucide-react-native';
 import * as Speech from 'expo-speech';
 
@@ -36,7 +37,8 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { api, getWeekRange, ymd } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
-import type { Task, Reward, StreakDayStatus, UserStreak } from '@/types';
+import type { Task, Reward, StreakDayStatus, UserStreak, Announcement } from '@/types';
+import { Image } from 'expo-image';
 import { GlassCard } from '@/components/glass-card';
 
 export default function DashboardScreen() {
@@ -49,6 +51,7 @@ export default function DashboardScreen() {
   const [streak, setStreak] = useState<UserStreak | null>(null);
   const [streakHistory, setStreakHistory] = useState<StreakDayStatus[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [motivation, setMotivation] = useState<string | null>(null);
   const [loadingMotivation, setLoadingMotivation] = useState(false);
   
@@ -85,17 +88,19 @@ export default function DashboardScreen() {
       d.setDate(d.getDate() - d.getDay()); // Sunday
       const fourteenWeeksAgoStr = ymd(d);
 
-      const [tasksRes, streakRes, historyRes, rewardsRes] = await Promise.all([
+      const [tasksRes, streakRes, historyRes, rewardsRes, announcementsRes] = await Promise.all([
         api.listTasks(startStr, endStr),
         api.getUserStreak(todayStr),
         api.getStreakHistory(fourteenWeeksAgoStr, todayStr),
         api.listRewards(),
+        api.listActiveAnnouncements(),
       ]);
 
       setTasks(tasksRes);
       setStreak(streakRes);
       setStreakHistory(historyRes);
       setRewards(rewardsRes);
+      setAnnouncements(announcementsRes);
     } catch (e) {
       console.error('Failed to fetch dashboard data', e);
     } finally {
@@ -349,6 +354,33 @@ Guidelines:
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Announcements */}
+          {announcements.length > 0 && (
+            <View style={styles.announcementsContainer}>
+              {announcements.map((ann) => (
+                <GlassCard key={ann.id} style={styles.announcementCard}>
+                  {ann.bannerUrl && (
+                    <View style={styles.announcementBannerContainer}>
+                      <Image source={{ uri: ann.bannerUrl }} style={styles.announcementBanner} />
+                    </View>
+                  )}
+                  <View style={styles.announcementHeader}>
+                    <Megaphone size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+                    <ThemedText style={styles.announcementAlertText}>
+                      Announcement Alert
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="smallBold" style={styles.announcementTitle}>
+                    {ann.title}
+                  </ThemedText>
+                  <ThemedText themeColor="textSecondary" style={styles.announcementDescription}>
+                    {ann.description}
+                  </ThemedText>
+                </GlassCard>
+              ))}
+            </View>
+          )}
+
           {/* Greeting Header */}
           <View style={styles.header}>
             <View>
@@ -1141,5 +1173,46 @@ const styles = StyleSheet.create({
   briefingDesc: {
     fontSize: 12,
     marginTop: 2,
+  },
+  announcementsContainer: {
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  announcementCard: {
+    borderRadius: Spacing.two,
+    padding: Spacing.three,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f59e0b20',
+  },
+  announcementBannerContainer: {
+    height: 120,
+    width: '100%',
+    borderRadius: Spacing.one,
+    overflow: 'hidden',
+    marginBottom: Spacing.two,
+  },
+  announcementBanner: {
+    width: '100%',
+    height: '100%',
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.one,
+  },
+  announcementAlertText: {
+    color: '#f59e0b',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  announcementTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: Spacing.one,
+  },
+  announcementDescription: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

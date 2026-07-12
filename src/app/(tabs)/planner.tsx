@@ -23,6 +23,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -34,11 +36,13 @@ import type { Task } from '@/types';
 import { GlassCard } from '@/components/glass-card';
 
 export default function PlannerScreen() {
+  "use no memo";
   const theme = useTheme();
 
   // State
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   
   // Dialog State
   const [formOpen, setFormOpen] = useState(false);
@@ -55,21 +59,52 @@ export default function PlannerScreen() {
   const [isOptional, setIsOptional] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const { start, end, days } = getWeekRange();
+  const { start, end, days } = getWeekRange(currentDate);
+  const startStr = ymd(start);
+  const endStr = ymd(end);
 
+  const isCurrentWeek = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today >= start && today <= new Date(end.getTime() + 86400000);
+  })();
+
+  const prevWeek = () => {
+    setCurrentDate((d) => {
+      const next = new Date(d);
+      next.setDate(next.getDate() - 7);
+      return next;
+    });
+  };
+
+  const nextWeek = () => {
+    setCurrentDate((d) => {
+      const next = new Date(d);
+      next.setDate(next.getDate() + 7);
+      return next;
+    });
+  };
+
+  const thisWeek = () => {
+    setCurrentDate(new Date());
+  };
+
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const fetchTasks = useCallback(async () => {
     try {
-      const data = await api.listTasks(ymd(start), ymd(end));
+      const data = await api.listTasks(startStr, endStr);
       setTasks(data);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [startStr, endStr]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   useFocusEffect(
     useCallback(() => {
+      setLoading(true);
       fetchTasks();
     }, [fetchTasks])
   );
@@ -202,15 +237,41 @@ export default function PlannerScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1, marginRight: Spacing.two }}>
             <ThemedText type="subtitle" style={styles.headerTitle}>
               Weekly Planner
             </ThemedText>
-            <ThemedText themeColor="textSecondary" style={styles.headerRange}>
-              {start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </ThemedText>
+            <View style={styles.rangeContainer}>
+              <TouchableOpacity
+                onPress={prevWeek}
+                style={[styles.navBtn, { backgroundColor: theme.backgroundSelected }]}
+                activeOpacity={0.7}
+              >
+                <ChevronLeft size={12} color={theme.text} />
+              </TouchableOpacity>
+              <ThemedText themeColor="textSecondary" style={[styles.headerRange, { marginTop: 0 }]}>
+                {start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={nextWeek}
+                style={[styles.navBtn, { backgroundColor: theme.backgroundSelected }]}
+                activeOpacity={0.7}
+              >
+                <ChevronRight size={12} color={theme.text} />
+              </TouchableOpacity>
+              
+              {!isCurrentWeek && (
+                <TouchableOpacity
+                  onPress={thisWeek}
+                  style={styles.todayBtn}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={styles.todayBtnText}>Today</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <TouchableOpacity style={styles.newButton} onPress={() => openNewTask(ymd(new Date()))}>
+          <TouchableOpacity style={styles.newButton} onPress={() => openNewTask(ymd(currentDate))}>
             <Plus size={16} color="#fff" style={{ marginRight: 4 }} />
             <ThemedText type="smallBold" style={{ color: '#fff' }}>
               New Task
@@ -702,6 +763,33 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  rangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.half,
+    gap: Spacing.two,
+  },
+  navBtn: {
+    padding: 6,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayBtn: {
+    marginLeft: Spacing.one,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3c87f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayBtnText: {
+    fontSize: 10,
+    color: '#3c87f7',
     fontWeight: 'bold',
   },
 });
